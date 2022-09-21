@@ -1,8 +1,8 @@
 import axios from 'axios'
 import Swal from 'sweetalert2'
 
-const baseURL = 'http://localhost:3000/api'
-// const baseURL = 'https://forum-express-api.herokuapp.com/api'
+// const baseURL = 'http://localhost:3000/api'
+const baseURL = 'https://forum-express-api.herokuapp.com/api'
 
 // axios.create() 方法會回傳一個自訂的 axios 實例
 const axiosInstance = axios.create({
