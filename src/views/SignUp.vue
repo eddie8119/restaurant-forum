@@ -62,7 +62,7 @@
         />
       </div>
 
-      <button class="btn btn-lg btn-primary btn-block mb-3" type="submit">
+      <button class="btn btn-lg btn-primary btn-block mb-3" :disabled="isProcessing" type="submit">
         Submit
       </button>
 
@@ -72,33 +72,75 @@
         </p>
       </div>
 
-      <p class="mt-5 mb-3 text-muted text-center">&copy; 2017-2018</p>
+      <p class="mt-5 mb-3 text-muted text-center">&copy; 2022</p>
     </form>
   </div>
 </template>
 
 <script>
+import authorizationAPI from "./../apis/authorization";
+import { Toast } from "./../utils/helpers";
+
 export default {
+  name: "SignUp",
   data() {
     return {
       name: "",
       email: "",
       password: "",
-      passwordCheck: "",
+      passwordCheck: "", 
+      isProcessing: false
     };
   },
   methods: {
-    handleSubmit() {
-      const data = JSON.stringify({
-        name: this.name,
-        email: this.email,
-        password: this.password,
-        passwordCheck: this.passwordCheck,
-      });
+    async handleSubmit() {
+      try {
+        this.isProcessing = true
 
-      // TODO: 向後端驗證使用者登入資訊是否合法
-      console.log("data", data);
-    },
+        const formData = {
+          name: this.name,
+          email: this.email,
+          password: this.password,
+          passwordCheck: this.passwordCheck,
+        }
+
+        if (
+          !this.name ||
+          !this.email ||
+          !this.password ||
+          !this.passwordCheck
+        ) {
+          this.isProcessing = false
+          Toast.fire({
+            icon: 'warning',
+            title: '請輸入完整資料'
+          })
+          return
+        } else if (this.password !== this.passwordCheck) {
+          this.isProcessing = false
+          Toast.fire({
+            icon: 'warning',
+            title: '請輸入相同密碼'
+          })
+          this.passwordCheck=''
+          return
+        }
+
+        const { data } = await authorizationAPI.signUp({ formData })
+
+        if (data.status !== "success") {
+          throw new Error(data.message)
+        }
+        
+        this.$router.push({ name: "sign-in" })
+      } catch(error) {
+        this.isProcessing = false
+        Toast.fire({
+          icon: "error",
+          title: "註冊失敗，請稍後再試"
+        })
+      }
+    }
   },
 };
 </script>

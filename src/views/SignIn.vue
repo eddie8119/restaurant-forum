@@ -2,7 +2,7 @@
   <div class="container py-5">
     <form class="w-100" @submit.prevent.stop="handleSubmit">
       <div class="text-center mb-4">
-        <h1 class="h3 mb-3 font-weight-normal">Sign In</h1>
+        <h1 class="h3 mb-3 font-weight-normal">Sign In</h1>        
       </div>
 
       <div class="form-label-group mb-2">
@@ -44,11 +44,11 @@
 
       <div class="text-center mb-3">
         <p>
-          <router-link to="/signup">Sign Up</router-link>
+          <router-link to="/signup">Sign Up</router-link>          
         </p>
       </div>
 
-      <p class="mt-5 mb-3 text-muted text-center">&copy; 2017-2018</p>
+      <p class="mt-5 mb-3 text-muted text-center">&copy; 2022</p>
     </form>
   </div>
 </template>
@@ -58,44 +58,55 @@ import authorizationAPI from "./../apis/authorization";
 import { Toast } from "./../utils/helpers";
 
 export default {
+  name: "SignIn",
   data() {
     return {
       email: "",
       password: "",
-      isProcessing: false,
+      isProcessing: false
     };
   },
   methods: {
     async handleSubmit() {
       try {
+        // 都沒輸入
         if (!this.email || !this.password) {
+          this.isProcessing = false
           Toast.fire({
-            icon: "warning",
-            title: "請填入 email 和 password",
-          });
-          return;
-        }
+            icon: 'warning',
+            title: '請填入 email 和 password'
+          })
+          return
+        }  
 
-        this.isProcessing = true;
+        this.isProcessing = true
 
         const response = await authorizationAPI.signIn({
           email: this.email,
-          password: this.password,
-        });
-
-        const { data } = response;
-        localStorage.setItem("token", data.token);
-        this.$router.push("/restaurants");
+          password: this.password
+        })
+      
+        const {data} = response
+       
+        if (data.status !== "success") {
+          throw new Error(data.message)
+        }
+        
+        localStorage.setItem('token', data.token)
+        
+        this.$store.commit('setCurrentUser', data.user)
+        
+        this.$router.push('/restaurants')
       } catch (error) {
-        this.isProcessing = false;
-        this.password = "";
+        this.isProcessing = false 
+        this.password = ''           
+        console.log("error", error)
         Toast.fire({
-          icon: "warning",
-          title: "請確認您輸入了正確的帳號密碼",
-        });
-        console.log("error", error);
+          icon: 'warning',
+          title: '請確認您輸入了正確的帳號密碼'
+        })
       }
-    },
+    }
   },
 };
 </script>

@@ -1,7 +1,6 @@
 <template>
   <div>
     <h2 class="my-4">所有評論：</h2>
-
     <div v-for="comment in restaurantComments" :key="comment.id">
       <blockquote class="blockquote mb-0">
         <button
@@ -30,38 +29,43 @@
 </template>
 
 <script>
-import { fromNowFilter } from "./../utils/mixins";
-
-const dummyUser = {
-  currentUser: {
-    id: 1,
-    name: "管理者",
-    email: "root@example.com",
-    image: "https://i.pravatar.cc/300",
-    isAdmin: true,
-  },
-  isAuthenticated: true,
-};
+import { fromNowFilter } from "./../utils/mixins"
+import { mapState } from "vuex"
+import commentsAPI from "./../apis/comments"
+import { Toast } from "./../utils/helpers"
 
 export default {
+  name:'RestaurantComments',
+  mixins: [fromNowFilter],
   props: {
     restaurantComments: {
       type: Array,
       required: true,
     },
   },
-  data() {
-    return {
-      currentUser: dummyUser.currentUser,
-      // currentUser: this.dummyUser.currentUser,
-    };
+  computed: {
+    ...mapState(['currentUser'])
   },
-  mixins: [fromNowFilter],
   methods: {
-    handleDeleteButtonClick(commentId) {
-      console.log("handleDeleteButtonClick", commentId);
-      this.$emit("after-delete-comment", commentId);
+    async handleDeleteButtonClick(commentId) {
+      try {
+        const response = await commentsAPI.delete({ commentId });
+        
+        if (response.data.status !== "success") {
+          throw new Error(response.data);
+        }
+        Toast.fire({
+          icon: "success",
+          title: "留言已刪除",
+        });
+        this.$emit("after-delete-comment", commentId);
+      } catch (error) {
+        Toast.fire({
+          icon: "error",
+          title: "無法刪除留言，請稍後再試",
+        });
+      }
     },
   },
-};
+}
 </script>

@@ -12,9 +12,9 @@
     </div>
   </form>
 </template>
-
 <script>
-import { v4 as uuidv4 } from "uuid";
+import commentsAPI from "./../apis/comments";
+import { Toast } from "./../utils/helpers";
 
 export default {
   name: "CreateComment",
@@ -30,13 +30,37 @@ export default {
     };
   },
   methods: {
-    handleSubmit() {
-      this.$emit("after-creat-comment", {
-        commentId: uuidv4(),
-        restaurantId: this.restaurantId,
-        text: this.text,
-      });
-      this.text = "";
+    async handleSubmit() {
+      try {
+        if (!this.text) {
+          Toast.fire({
+            icon: "warning",
+            title: "請輸入留言",
+          });
+          throw new Error("請輸入留言");
+        }
+        const response = await commentsAPI.create({
+          restaurantId: this.restaurantId,
+          text: this.text,
+        })
+        
+        if (response.data.status !== "success") {
+          throw new Error(response.data)
+        }
+   
+        this.$emit("after-create-comment", {
+          commentId: response.data.commentId,
+          restaurantId: this.restaurantId,
+          text: this.text,
+        })
+        this.text = ""
+      } catch (error) {
+        console.log(error)
+        Toast.fire({
+          icon: "error",
+          title: "無法新增留言，請稍後再試",
+        });
+      }
     },
   },
 };

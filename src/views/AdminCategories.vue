@@ -1,49 +1,77 @@
 <template>
   <div class="container py-5">
-    <!-- 1. 使用先前寫好的 AdminNav -->
     <AdminNav />
-
     <form class="my-4">
       <div class="form-row">
         <div class="col-auto">
           <input
-            v-model="newCategoryName"
+            v-model="newCategoryName"           
             type="text"
             class="form-control"
             placeholder="新增餐廳類別..."
-          />
+          >
         </div>
         <div class="col-auto">
           <button
-            @click.stop.prevent="creatCategory"
             type="button"
             class="btn btn-primary"
+            :disabled="isProcessing === true"
+            @click.stop.prevent="createCategory"   
           >
-            新增
+            {{ isProcessing ? "處理中" : "新增" }}
           </button>
         </div>
       </div>
     </form>
-    <table class="table">
+    <SpinneR v-if="isLoading" />
+    <table v-else class="table">
       <thead class="thead-dark">
         <tr>
           <th scope="col" width="60">#</th>
           <th scope="col">Category Name</th>
           <th scope="col" width="210">Action</th>
         </tr>
-      </thead>
+      </thead>      
       <tbody>
         <tr v-for="category in categories" :key="category.id">
           <th scope="row">
             {{ category.id }}
           </th>
           <td class="position-relative">
-            <div class="category-name">
+            <div v-show="!category.isEditing" class="category-name">
               {{ category.name }}
             </div>
+            <input
+              v-show="category.isEditing"
+              v-model="category.name"
+              type="text"
+              class="form-control"
+            >
+            <span
+              v-show="category.isEditing"
+              class="cancel"
+              @click="handleCancel(category.id)"
+            >
+              ✕
+            </span>
           </td>
           <td class="d-flex justify-content-between">
-            <button type="button" class="btn btn-link mr-2">Edit</button>
+            <button 
+              v-show="!category.isEditing" 
+              @click.stop.prevent="toggleIsEditing(category.id)"
+              type="button" 
+              class="btn btn-link mr-2"
+            >
+              Edit
+            </button>
+            <button
+              v-show="category.isEditing"
+              type="button"
+              class="btn btn-link mr-2"
+              @click.stop.prevent="updateCategory({ categoryId: category.id, name: category.name })"
+            >
+              Save
+            </button> 
             <button
               @click.stop.prevent="deleteCategory(category.id)"
               type="button"
@@ -59,71 +87,208 @@
 </template>
 
 <script>
-import AdminNav from "@/components/AdminNav";
-import { v4 as uuidv4 } from "uuid";
-//  2. 定義暫時使用的資料
-const dummyData = {
-  categories: [
-    {
-      id: 1,
-      name: "中式料理",
-      createdAt: "2019-06-22T09:00:43.000Z",
-      updatedAt: "2019-06-22T09:00:43.000Z",
-    },
-    {
-      id: 2,
-      name: "日本料理",
-      createdAt: "2019-06-22T09:00:43.000Z",
-      updatedAt: "2019-06-22T09:00:43.000Z",
-    },
-    {
-      id: 3,
-      name: "義大利料理",
-      createdAt: "2019-06-22T09:00:43.000Z",
-      updatedAt: "2019-06-22T09:00:43.000Z",
-    },
-    {
-      id: 4,
-      name: "墨西哥料理",
-      createdAt: "2019-06-22T09:00:43.000Z",
-      updatedAt: "2019-06-22T09:00:43.000Z",
-    },
-  ],
-};
+import AdminNav from "@/components/AdminNav"
+import adminAPI from './../apis/admin'
+import {Toast} from './../utils/helpers'
+import SpinneR from '@/components/SpinneR'
 
 export default {
   name: "AdminCategories",
   components: {
     AdminNav,
-  },
-  // 3. 定義 Vue 中使用的 data 資料
+    SpinneR
+  },  
   data() {
-    return {
+    return {      
       categories: [],
       newCategoryName: "",
+      isLoading: true,      
+      isProcessing: false,
     };
   },
-  // 5. 調用 `fetchCategories` 方法
   created() {
     this.fetchCategories();
   },
-  methods: {
-    // 4. 定義 `fetchCategories` 方法，把 `dummyData` 帶入 Vue 物件
-    fetchCategories() {
-      this.categories = dummyData.categories;
+  methods:{
+    async fetchCategories() {
+      try {
+        const response = await adminAPI.categories.get()
+        
+        if (response.statusText !== "OK") {
+          throw new Error("無法載入餐廳分類，請稍後再試");
+        }
+
+        console.log(response.data.categories)
+
+        this.categories = response.data.categories.map(category => ({
+          ...category,
+          isEditing: false,
+          nameCached: "",          
+        }))
+
+        this.isLoading = false
+      } catch(error) {   
+        this.isLoading = false    
+        Toast.fire({
+          icon: 'error',
+          title: '無法載入餐廳分類，請稍後再試'
+        })
+      }
     },
-    creatCategory() {
-      this.categories.push({
-        id: uuidv4(),
-        name: this.newCategoryName,
-      });
-      this.newCategoryName = "";
+    async createCategory() {
+      try {
+        if (!this.newCategoryName.trim()) { //凡是輸入的起手式 然後記得清空
+          Toast.fire({
+            icon: 'warning',
+            title: '請輸入餐廳類別'
+          })
+          return
+        }
+
+        this.isProcessing = true        
+        
+        const {data} = await adminAPI.categories.create({
+          name: this.newCategoryName
+        })
+        
+        if (data.status === 'error') {         
+          throw new Error(data.message);
+        }
+        
+        this.categories.push({          
+          id: data.categoryId, //這個最奇怪
+          name: this.newCategoryName,
+          isEditing: false,
+          nameCached: ''
+        })
+        this.newCategoryName = ''
+        this.isProcessing = false
+      } catch(error) {   
+        console.log(error);
+        this.isProcessing = false
+        this.newCategoryName = ''    
+        Toast.fire({
+          icon: 'error',
+          title: '無法新增餐廳分類，請稍後再試'
+        })
+      }
     },
-    deleteCategory(categoryId) {
-      this.categories = this.categories.filter(
-        (category) => category.id !== categoryId
-      );
+    async deleteCategory (categoryId) {
+      try {
+        const { data } = await adminAPI.categories.delete({categoryId})
+        if (data.status !== 'success') {
+          throw new Error(data.message)
+        }
+        
+        this.categories = this.categories.filter (
+            category => category.id !== categoryId
+        )
+        Toast.fire({
+          icon: 'success',
+          title: '成功刪除該餐廳類別'
+        })
+      } catch (error) {
+        console.log(error)
+        Toast.fire({
+          icon: 'error',
+          title: '無法刪除餐廳類別，請稍後再試'
+        })
+      }
     },
-  },
+    toggleIsEditing(categoryId) {
+      this.categories = this.categories.map(category => {
+        if(category.id === categoryId) {
+          return {
+            ...category,
+            isEditing: !category.isEditing,
+            nameCached: category.name
+          }
+        } else {
+          return category
+        }
+      })
+    },
+    async updateCategory({categoryId, name}) {
+      try {
+        const { data } = await adminAPI.categories.update({
+          categoryId,
+          name,
+        });
+        if (data.status !== "success") {
+          throw new Error(data.message);
+        }
+        // 正在編輯的那筆變成編輯狀態樣式
+        this.toggleIsEditing(categoryId);
+      } catch (error) {
+        console.log(error);
+        Toast.fire({
+          icon: "error",
+          title: "無法更新餐廳分類，請稍後再試",
+        });
+      }
+    },
+    handleCancel(categoryId) {
+      this.categories = this.categories.map(category => {
+        if (category.id === categoryId) {
+          return {
+            ...category,
+            name: category.nameCached
+          }
+        }
+        return category
+      })
+      this.toggleIsEditing(categoryId)
+    },
+
+    // fetchCategories () {
+    //   this.categories = dummyData.categories.map(category => ({
+    //     ...category,
+    //     isEditing: false,
+    //     nameCached: ''
+    //   }))
+    // },
+    // createCategory () {
+    //   this.categories.push({
+    //     id: uuidv4(),
+    //     name: this.newCategoryName
+    //   })
+    //   this.newCategoryName = ''
+    // },    
+    // deleteCategory (categoryId) {
+    //   this.categories = this.categories.filter(
+    //     category => category.id !== categoryId
+    //   )
+    // }
+  } 
 };
 </script>
+
+<style scoped>
+  .category-name {
+    padding: 0.375rem 0.75rem;
+    border: 1px solid transparent;
+    outline: 0;
+    cursor: auto;
+  }
+  
+  .btn-link {
+    width: 62px;
+  }
+  
+  .cancel {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 25px;
+    height: 25px;
+    border: 1px solid #aaaaaa;
+    border-radius: 50%;
+    user-select: none;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  </style>
